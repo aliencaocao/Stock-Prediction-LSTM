@@ -1,4 +1,4 @@
-# Stock-Prediction-LSTM
+# LSTM based Stock Prediction
 
 Stock data from Yahoo Finance
 Run LSTM Stock Prediction V3.py to train and predict
