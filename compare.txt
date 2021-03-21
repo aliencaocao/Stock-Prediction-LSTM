@@ -1,0 +1,29 @@
+lr=0.008 decay 1e-6
+val loss 0.05807
+
+lr=0.0005  decay 1e-6
+val losee 0.04935
+
+lr = 0.0006 decay 1e-6
+val loss 0.0477
+
+lr = 0.0007 decay 1e-6
+val loss 0.0386
+
+lr = 0.0008 decay 1e-6
+val loss 0.0657
+
+lr = 0.0005 decay 1e-7
+val loss 0.0529
+
+lr = 0.0006 decay 1e-7
+val loss 
+
+lr = 0.0005 decay 1e-7
+val loss 
+
+lr = 0.0007 decay 1e-5
+val loss 0.0583
+
+conclusion: lr = 0.0007 decay 1e-6 best
+but then defult is still better
