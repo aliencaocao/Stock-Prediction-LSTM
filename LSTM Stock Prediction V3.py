@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import yfinance as yf
+import sklearn
+from sklearn.model_selection import train_test_split
 from pandas_datareader import data
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras import Sequential, initializers, mixed_precision
@@ -21,7 +23,7 @@ print(f'Running on Tensor Flow {tf.__version__} and Python {sys.version}.')
 print('Libraries successfully imported. Initializing variables...')
 
 # Define some variables for ease of change in the model
-Stock = 'ENPH'  # Stock to predict
+Stock = 'tsla'.upper()  # Stock to predict
 checkpoint_path = f"V3models/{Stock} Check point.ckpt"
 model_path = f'V3models/{Stock}.tf'
 load_path = model_path  # CHANGE THIS TO TOGGLE
@@ -33,7 +35,7 @@ DROPOUT = [0.002, 0.002, 0.003, 0.003]
 UNITS = [256, 512, 512, 512]
 BATCH_SIZE = 32
 EPOCH = 11  # how many times to run at once, AMD 90
-SEQ_LEN = 64  # how many days back used to predict, optimal 30/40 for NVDA
+SEQ_LEN = 30  # how many days back used to predict, optimal 30/40 for NVDA
 initializer = initializers.GlorotNormal()  # Xavier Normal initializer
 LEARNING_RATE = 1e-3
 LEARNING_DECAY = 1e-6
@@ -69,6 +71,7 @@ print(
 
 # Separating Data into training and validating.
 print(f'Gathered {len(data)} timestamps of data. Processing...')
+# X_train, Y_train, X_test, Y_test = train_test_split(data['Open', 'High', 'Low', 'Close', 'Volume'], data['Close'], test_size=train_data_pct, shuffle=False)
 # number of columns used to train
 train_data_len = np.math.ceil(len(data) * train_data_pct)
 data_training = data[:train_data_len]
@@ -88,7 +91,7 @@ for i in range(SEQ_LEN, training_data.shape[0]):
     y_train.append(training_data[i, 0])
 
 X_train, y_train = np.array(X_train), np.array(y_train)
-# print(X_train.shape, y_train.shape)
+print(X_train.shape, y_train.shape)
 
 # Preparing dataset for training
 past_days = data_training.tail(SEQ_LEN)
@@ -139,7 +142,7 @@ model.summary()
 # print(f'Weights loaded from {checkpoint_path}')
 print('Compiling model...')
 model.compile(optimizer=opt, loss=tf.keras.losses.Huber(),
-              metrics=['mean_absolute_error'])
+              metrics=['mean_squared_error'])
 
 checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
                                                 save_best_only=True,

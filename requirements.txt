@@ -4,5 +4,5 @@ numpy~=1.19.5
 tensorflow~=2.4.1
 scikit-learn~=0.24.1
 matplotlib~=3.4.1
-yfinance~=0.1.55
+yfinance~=0.1.59
 ta~=0.7.0

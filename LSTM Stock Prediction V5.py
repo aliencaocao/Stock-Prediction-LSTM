@@ -5,6 +5,7 @@ from tensorflow.keras import Sequential, initializers
 from tensorflow.keras.layers import Dense, LSTM, Dropout
 from tensorflow.keras.mixed_precision import experimental as mixed_precision
 from sklearn.preprocessing import MinMaxScaler
+import sklearn
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -55,6 +56,7 @@ print(f'{Stock} Stock data on interval of {Interval} from past {Period} to {LAST
 print(f'Gathered {len(data)} timestamps of data. Processing...')
 scaled_data = scaler.fit_transform(data)  # Normalise to between 0 and 1
 norm_scale = 1 / scaler.scale_[3]  # Save the normalisation factor for later use
+# x_train, y_train, x_test, y_test = sklearn.model_selection.train_test_split(data, data['Close'], test_size=train_data_pct, shuffle=False)
 train_data_len = np.math.ceil(len(scaled_data) * train_data_pct)
 training_data = scaled_data[:train_data_len]
 val_data = scaled_data[train_data_len:]
