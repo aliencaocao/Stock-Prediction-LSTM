@@ -10,17 +10,17 @@ import tensorflow as tf
 import yfinance as yf
 import sklearn
 from sklearn.model_selection import train_test_split
-from pandas_datareader import data
+# from pandas_datareader import data
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras import Sequential, initializers, mixed_precision
-from tensorflow.keras.layers import Dense, LSTM, Dropout
+from tensorflow.keras import Sequential, initializers, mixed_precision, models, Model
+from tensorflow.keras.layers import *
 
 physical_devices = tf.config.experimental.list_physical_devices('GPU')
 assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
 config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
 mixed_precision.set_global_policy('mixed_float16')
+
 print(f'Running on Tensor Flow {tf.__version__} and Python {sys.version}.')
-print('Libraries successfully imported. Initializing variables...')
 
 # Define some variables for ease of change in the model
 Stock = 'tsla'.upper()  # Stock to predict
@@ -33,15 +33,15 @@ ACTIVATION = 'tanh'
 RECURRENT_ACTIVATION = 'sigmoid'
 DROPOUT = [0.002, 0.002, 0.003, 0.003]
 UNITS = [256, 512, 512, 512]
-BATCH_SIZE = 32
-EPOCH = 11  # how many times to run at once, AMD 90
-SEQ_LEN = 30  # how many days back used to predict, optimal 30/40 for NVDA
+BATCH_SIZE = 1024
+EPOCH = 50  # how many times to run at once, AMD 90
+SEQ_LEN = 100  # how many days back used to predict, optimal 30/40 for NVDA
 initializer = initializers.GlorotNormal()  # Xavier Normal initializer
 LEARNING_RATE = 1e-3
 LEARNING_DECAY = 1e-6
 STATEFUL = False
 train_data_pct = 0.80  # percentage of data used for training
-opt = tf.keras.optimizers.Adam(lr=LEARNING_RATE)  # decay=LEARNING_DECAY
+opt = tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE)  # decay=LEARNING_DECAY
 # opt = tf.keras.optimizers.Adam()
 TODAY = pd.to_datetime('today').to_pydatetime()
 offset = max(1, (TODAY.weekday() + 6) % 7 - 3)
@@ -59,10 +59,10 @@ class ResetStatesCallback(tf.keras.callbacks.Callback):
 print(
     f'Stock to predict: {Stock}. The last working day is {LAST_WORKING_DAY}, getting data from {START_DATE} to {LAST_WORKING_DAY}.')
 # Read data
-data = data.DataReader(f'{Stock}',
-                       start=f'{START_DATE}',
-                       end=f'{LAST_WORKING_DAY}',
-                       data_source='yahoo')
+# data = data.DataReader(f'{Stock}',
+#                        start=f'{START_DATE}',
+#                        end=f'{LAST_WORKING_DAY}',
+#                        data_source='yahoo')
 data = yf.download(tickers=f'{Stock}', period="730d", interval='1h')
 last_close_price = float("{:.2f}".format(data.iloc[-1]["Close"]))
 sec_last_close_price = float("{:.2f}".format(data.iloc[-2]["Close"]))
@@ -77,11 +77,9 @@ train_data_len = np.math.ceil(len(data) * train_data_pct)
 data_training = data[:train_data_len]
 data_test = data[train_data_len:]
 
-training_data = data_training.drop(
-    ['Adj Close'], axis=1)  # Ditch adjusted close
+training_data = data_training.drop(['Adj Close'], axis=1)  # Ditch adjusted close
 scaler = MinMaxScaler()
-training_data = scaler.fit_transform(
-    training_data)  # Normalise to between 0 and 1
+training_data = scaler.fit_transform(training_data)  # Normalise to between 0 and 1
 
 X_train = []
 y_train = []
@@ -109,40 +107,54 @@ X_test, y_test = np.array(X_test), np.array(y_test)
 print(f'Processed and scaled data according to ratio {scaler.scale_[0]}.')
 
 # Building LSTM Model
-print('Initializing LSTM Model...')
-model = Sequential()
+print('Initializing Model...')
+# model = Sequential()
 
 
 # model = tf.keras.models.load_model(load_path)  # uncomment this if not training for first time
 # print(f'Model loaded successfully from {load_path}.')
-def build_model():
-    model.add(LSTM(units=UNITS[0], activation=ACTIVATION, return_sequences=True,
-                   input_shape=(X_train.shape[1], X_train.shape[2]),
-                   kernel_initializer=initializer, stateful=STATEFUL,
-                   recurrent_activation=RECURRENT_ACTIVATION, recurrent_dropout=0, unroll=False, use_bias=True))
-    model.add(Dropout(DROPOUT[0]))
+xIn = Input(shape=(SEQ_LEN, 5))
+x = LSTM(64, return_sequences=True)(xIn)
+x = LayerNormalization()(x)
+x = SpatialDropout1D(0.2)(x)
+x = LSTM(128, return_sequences=True)(x)
+x = LayerNormalization()(x)
+x = SpatialDropout1D(0.2)(x)
+x = LSTM(256, return_sequences=False)(x)
+x = Dense(256)(x)
+x = Dropout(0.2)(x)
+x = Dense(128)(x)
+xOut = Dense(1)(x)
 
-    model.add(LSTM(units=UNITS[1], activation=ACTIVATION, return_sequences=False,
-                   kernel_initializer=initializer, stateful=STATEFUL,
-                   recurrent_activation=RECURRENT_ACTIVATION, recurrent_dropout=0, unroll=False, use_bias=True))
-    model.add(Dropout(DROPOUT[1]))
+model = Model(inputs=xIn, outputs=xOut)
 
-    # model.add(LSTM(units=UNITS[2], activation=ACTIVATION, return_sequences=False, kernel_initializer=initializer,
-    #                recurrent_activation=RECURRENT_ACTIVATION, recurrent_dropout=0, stateful=STATEFUL,
-    #                unroll=False, use_bias=True))
-    # model.add(Dropout(DROPOUT[2]))
-
-    model.add(Dense(units=1))
-
-
-build_model()  # model structure: uncomment if building model for first time
+# def build_model():
+#     model.add(LSTM(units=UNITS[0], activation=ACTIVATION, return_sequences=True,
+#                    input_shape=(X_train.shape[1], X_train.shape[2]),
+#                    kernel_initializer=initializer, stateful=STATEFUL,
+#                    recurrent_activation=RECURRENT_ACTIVATION, recurrent_dropout=0, unroll=False, use_bias=True))
+#     model.add(Dropout(DROPOUT[0]))
+#
+#     model.add(LSTM(units=UNITS[1], activation=ACTIVATION, return_sequences=False,
+#                    kernel_initializer=initializer, stateful=STATEFUL,
+#                    recurrent_activation=RECURRENT_ACTIVATION, recurrent_dropout=0, unroll=False, use_bias=True))
+#     model.add(Dropout(DROPOUT[1]))
+#
+#     # model.add(LSTM(units=UNITS[2], activation=ACTIVATION, return_sequences=False, kernel_initializer=initializer,
+#     #                recurrent_activation=RECURRENT_ACTIVATION, recurrent_dropout=0, stateful=STATEFUL,
+#     #                unroll=False, use_bias=True))
+#     # model.add(Dropout(DROPOUT[2]))
+#
+#     model.add(Dense(units=1))
+#
+#
+# build_model()  # model structure: uncomment if building model for first time
 
 model.summary()
 # model.load_weights(checkpoint_path)
 # print(f'Weights loaded from {checkpoint_path}')
 print('Compiling model...')
-model.compile(optimizer=opt, loss=tf.keras.losses.Huber(),
-              metrics=['mean_squared_error'])
+model.compile(optimizer=opt, loss='mse', metrics=['mse'])
 
 checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
                                                 save_best_only=True,
@@ -166,6 +178,8 @@ history = model.fit(
     epochs=EPOCH,
     batch_size=BATCH_SIZE,
     validation_data=(X_test, y_test),
+    use_multiprocessing=True,
+    verbose=1,
     # shuffle=False,
     # callbacks=[reset_states],
     # callbacks=[reset_states, early_stop]
